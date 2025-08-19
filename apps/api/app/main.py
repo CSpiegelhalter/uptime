@@ -1,18 +1,32 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-import os
+from .config import settings
+from .db import Base, engine
+from .routers import monitors, status
+from .services.scheduler import start_scheduler
 
 app = FastAPI(title="Uptime API")
 
-# CORS (allow Next.js dev on 3000)
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[os.getenv("WEB_ORIGIN","http://localhost:3000")],
+    allow_origins=[settings.WEB_ORIGIN],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
+# Auto-create tables (simple dev bootstrap; swap to Alembic later)
+Base.metadata.create_all(bind=engine)
+
+# Routers
+app.include_router(monitors.router)
+app.include_router(status.router)
+
 @app.get("/healthz")
 def healthz():
     return {"status": "ok"}
+
+@app.on_event("startup")
+async def _startup():
+    start_scheduler()

@@ -46,10 +46,12 @@ services:
       - ./apps/web:/app
       - web-node-modules:/app/node_modules
     environment:
-      NEXT_PUBLIC_API_BASE: http://localhost:8000
+      NEXT_PUBLIC_API_BASE: http://localhost:8000   # browser -> host port
+      API_BASE_INTERNAL: http://api:8000            # server code -> api service
     ports: ["3000:3000"]
     depends_on: [ api ]
     command: sh -c "npm install && npm run dev"
+
 
 volumes:
   db-data:
