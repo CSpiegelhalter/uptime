@@ -1,11 +1,6 @@
-export const dynamic = "force-dynamic";
+import { apiBase } from "@/lib/api";
 
-function apiBase() {
-  // When running on the server (in the container), use the internal URL.
-  return process.env.API_BASE_INTERNAL
-    ?? process.env.NEXT_PUBLIC_API_BASE
-    ?? "http://localhost:8000";
-}
+export const dynamic = "force-dynamic";
 
 async function getMonitors() {
   const base = apiBase();

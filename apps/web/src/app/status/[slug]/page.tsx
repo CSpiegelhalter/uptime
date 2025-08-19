@@ -1,14 +1,20 @@
+import { apiBase } from "@/lib/api";
+
 export const dynamic = "force-dynamic";
 
 async function getStatus(slug: string) {
-  const base = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+  const base = apiBase()
   const res = await fetch(`${base}/v1/status/${slug}`, { cache: "no-store" });
   if (!res.ok) return null;
   return res.json();
 }
 
-export default async function StatusPage({ params }: { params: { slug: string } }) {
-  const data = await getStatus(params.slug);
+export default async function StatusPage(
+    { params }: { params: Promise<{ slug: string }> }
+  ) {
+    const { slug } = await params;          // ← await params before using it
+    const data = await getStatus(slug);
+  
   if (!data) return <main className="p-8">Not found</main>;
   const m = data.monitors[0];
   const last = m?.last;

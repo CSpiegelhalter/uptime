@@ -1,13 +1,14 @@
 "use client";
 
 import { useState } from "react";
+import { apiBase } from "@/lib/api";
 
 export default function NewMonitor() {
   const [name, setName] = useState("");
   const [url, setUrl] = useState("https://");
   const [intervalSec, setIntervalSec] = useState(60);
   const [expected, setExpected] = useState(200);
-  const base = process.env.NEXT_PUBLIC_API_BASE || "http://localhost:8000";
+  const base = apiBase()
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
