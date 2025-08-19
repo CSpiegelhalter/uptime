@@ -89,3 +89,15 @@ def start_scheduler():
     scheduler.start()
     # kick off initial schedule (fire and forget)
     asyncio.get_event_loop().create_task(load_all_monitors_and_schedule())
+
+def unschedule_monitor(monitor_id: str):
+    global scheduler
+    if not scheduler:
+        return
+    job_id = f"monitor:{monitor_id}"
+    try:
+        j = scheduler.get_job(job_id)
+        if j:
+            j.remove()
+    except Exception:
+        pass

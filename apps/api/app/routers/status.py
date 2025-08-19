@@ -26,6 +26,7 @@ def public_status(slug: str, db: Session = Depends(get_db)):
     return {
         "slug": slug,
         "monitors": [{
+            "id": m.id,
             "name": m.name,
             "url": m.url,
             "interval_sec": m.interval_sec,
