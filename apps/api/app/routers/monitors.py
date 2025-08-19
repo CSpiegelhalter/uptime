@@ -20,7 +20,10 @@ def create_monitor(payload: MonitorCreate, db: Session = Depends(get_db)):
         expected_status=payload.expected_status,
     )
     db.add(m); db.commit(); db.refresh(m)
-    schedule_monitor(m)
+
+    # 🔹 schedule + run first check immediately
+    schedule_monitor(m, immediate=True)
+
     return m
 
 @router.get("", response_model=list[MonitorRead])

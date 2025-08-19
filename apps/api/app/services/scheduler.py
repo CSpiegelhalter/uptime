@@ -3,6 +3,7 @@ import httpx
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy import select, desc
 from sqlalchemy.orm import Session
+from datetime import datetime, timezone
 
 from ..db import SessionLocal
 from ..models import Monitor, Check, Incident
@@ -40,17 +41,39 @@ async def ping_once(monitor_id: str):
     finally:
         db.close()
 
-def schedule_monitor(mon: Monitor):
+def schedule_monitor(mon: Monitor, immediate: bool = False):
     global scheduler
-    if not scheduler: return
-    # job id per monitor so we can replace later
+    if not scheduler:
+        return
+
     job_id = f"monitor:{mon.id}"
     try:
         j = scheduler.get_job(job_id)
-        if j: j.remove()
+        if j:
+            j.remove()
     except Exception:
         pass
-    scheduler.add_job(ping_once, "interval", seconds=mon.interval_sec, id=job_id, args=[mon.id], replace_existing=True)
+
+    # periodic job
+    scheduler.add_job(
+        ping_once,
+        "interval",
+        seconds=mon.interval_sec,
+        id=job_id,
+        args=[mon.id],
+        replace_existing=True,
+    )
+
+    # ✅ first ping right away as a one-shot "date" job (runs inside scheduler loop)
+    if immediate:
+        scheduler.add_job(
+            ping_once,
+            "date",
+            run_date=datetime.now(timezone.utc),
+            args=[mon.id],
+            misfire_grace_time=30,
+        )
+
 
 async def load_all_monitors_and_schedule():
     db = SessionLocal()
