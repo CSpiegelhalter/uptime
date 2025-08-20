@@ -3,15 +3,17 @@ from sqlalchemy.orm import Session
 from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from ..db import get_db, Base, engine
-from ..models import Monitor, Check
+from ..models import Monitor, Check, User
 from ..schemas import MonitorCreate, MonitorRead, Summary
 from ..utils import ulid, slugify, unique_slug
 from ..services.scheduler import schedule_monitor, unschedule_monitor
+from ..deps import get_current_user
+
 
 router = APIRouter(prefix="/v1/monitors", tags=["monitors"])
 
 @router.post("", response_model=MonitorRead, status_code=201)
-def create_monitor(payload: MonitorCreate, db: Session = Depends(get_db)):
+def create_monitor(payload: MonitorCreate, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     base_slug = slugify(payload.name or "Untitled")
     slug = unique_slug(db, base_slug)
 
@@ -51,8 +53,8 @@ def create_monitor(payload: MonitorCreate, db: Session = Depends(get_db)):
     raise HTTPException(status_code=409, detail="A monitor with a similar name already exists. Please try a different name.")
 
 @router.get("", response_model=list[MonitorRead])
-def list_monitors(db: Session = Depends(get_db)):
-    return db.query(Monitor).order_by(Monitor.created_at.desc()).all()
+def list_monitors(db: Session = Depends(get_db), user: User = Depends(get_current_user)):
+    return db.query(Monitor).filter(Monitor.user_id == user.id).order_by(Monitor.created_at.desc()).all()
 
 @router.get("/{monitor_id}", response_model=MonitorRead)
 def get_monitor(monitor_id: str, db: Session = Depends(get_db)):
@@ -61,14 +63,12 @@ def get_monitor(monitor_id: str, db: Session = Depends(get_db)):
     return m
 
 @router.delete("/{monitor_id}", status_code=204)
-def delete_monitor(monitor_id: str, db: Session = Depends(get_db)):
+def delete_monitor(monitor_id: str, db: Session = Depends(get_db), user: User = Depends(get_current_user)):
     m = db.get(Monitor, monitor_id)
-    if not m:
+    if not m or m.user_id != user.id:
         raise HTTPException(404, "Monitor not found")
-    unschedule_monitor(m)               
-    db.delete(m)
-    db.commit()
-    return
+    unschedule_monitor(m.id)
+    db.delete(m); db.commit()
 
 @router.get("/{monitor_id}/summary", response_model=Summary)
 def monitor_summary(monitor_id: str, range: str = "24h", db: Session = Depends(get_db)):

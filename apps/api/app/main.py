@@ -2,7 +2,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from .config import settings
 from .db import Base, engine
-from .routers import monitors, status, demo
+from .routers import monitors, status, demo, auth
 from .services.scheduler import start_scheduler
 
 app = FastAPI(title="Uptime API")
@@ -23,6 +23,7 @@ Base.metadata.create_all(bind=engine)
 app.include_router(monitors.router)
 app.include_router(status.router)
 app.include_router(demo.router)
+app.include_router(auth.router)
 
 @app.get("/healthz")
 def healthz():
