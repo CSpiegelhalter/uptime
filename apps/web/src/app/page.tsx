@@ -1,19 +1,33 @@
-import MonitorCard, { MonitorListItem } from "@/components/MonitorCard";
+import MonitorCard, { type MonitorListItem } from "@/components/MonitorCard";
 import { apiBase } from "@/lib/api";
+import { readTokenServer } from "@/lib/session";
 
 export const dynamic = "force-dynamic";
 
-async function fetchMonitors() {
+async function fetchMonitors(): Promise<MonitorListItem[]> {
   const base = apiBase();
-  const res = await fetch(`${base}/v1/monitors`, { cache: "no-store" });
+  const token = await readTokenServer();
+  const authHeaders = token ? { Authorization: `Bearer ${token}` } : undefined;
+
+  // List monitors (private)
+  const res = await fetch(`${base}/v1/monitors`, {
+    cache: "no-store",
+    headers: authHeaders
+  });
+  console.log(authHeaders)
+  
   if (!res.ok) return [];
+  console.log('after')
   const monitors = await res.json();
 
-  // Enrich each monitor with summary + last check (status page)
+  // Enrich each monitor with summary (private) + last check via public status
   const enriched = await Promise.all(
     monitors.map(async (m: any) => {
       const [sumRes, statRes] = await Promise.all([
-        fetch(`${base}/v1/monitors/${m.id}/summary?range=24h`, { cache: "no-store" }),
+        fetch(`${base}/v1/monitors/${m.id}/summary?range=24h`, {
+          cache: "no-store",
+          headers: authHeaders,
+        }),
         fetch(`${base}/v1/status/${m.slug}`, { cache: "no-store" }),
       ]);
 
@@ -34,45 +48,11 @@ async function fetchMonitors() {
   return enriched;
 }
 
-function StatusDot({ ok }: { ok: boolean | null }) {
-  const color = ok === null ? "bg-gray-300" : ok ? "bg-emerald-500" : "bg-red-500";
-  const label = ok === null ? "No data" : ok ? "Up" : "Down";
-  return (
-    <span className="inline-flex items-center gap-2">
-      <span className={`h-2.5 w-2.5 rounded-full ${color}`} />
-      <span className="text-sm text-gray-600">{label}</span>
-    </span>
-  );
-}
-
-function Badge({ children }: { children: React.ReactNode }) {
-  return (
-    <span className="inline-flex items-center rounded-full border border-gray-200 px-2.5 py-1 text-xs font-medium text-gray-700">
-      {children}
-    </span>
-  );
-}
-
 export default async function Home() {
   const monitors = await fetchMonitors();
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Top bar */}
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/70 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="h-6 w-6 rounded-lg bg-gradient-to-tr from-emerald-500 to-sky-500 shadow-sm" />
-            <span className="text-lg font-semibold tracking-tight">Uptime Monitor</span>
-          </div>
-          <a
-            href="/monitors/new"
-            className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-800"
-          >
-            + New Monitor
-          </a>
-        </div>
-      </header>
 
       {/* Content */}
       <main className="mx-auto max-w-6xl px-6 py-8">

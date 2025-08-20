@@ -14,7 +14,13 @@ export type MonitorListItem = {
   lastLatency?: number | null;
 };
 
-export default function MonitorCard({ m }: { m: MonitorListItem }) {
+export default function MonitorCard({
+  m,
+  readOnly = false,
+}: {
+  m: MonitorListItem;
+  readOnly?: boolean;
+}) {
   return (
     <li className="group rounded-2xl border border-slate-200 bg-white p-5 shadow-sm ring-1 ring-transparent transition hover:shadow-md hover:ring-emerald-100">
       <div className="flex items-start justify-between">
@@ -32,13 +38,16 @@ export default function MonitorCard({ m }: { m: MonitorListItem }) {
             {m.url}
           </a>
         </div>
-        <a
-          href={`/status/${m.slug}`}
-          className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
-          title="Public status"
-        >
-          Status
-        </a>
+
+        {!readOnly && (
+          <a
+            href={`/status/${m.slug}`}
+            className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs font-medium text-slate-700 hover:bg-slate-50"
+            title="Public status"
+          >
+            Status
+          </a>
+        )}
       </div>
 
       <div className="mt-4 flex flex-wrap items-center gap-2">
@@ -72,20 +81,22 @@ export default function MonitorCard({ m }: { m: MonitorListItem }) {
       </div>
 
       {/* Actions */}
-      <div className="mt-5 flex items-center gap-2">
-        <a
-          href={`/status/${m.slug}`}
-          className="inline-flex flex-1 items-center justify-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
-        >
-          View status
-        </a>
-        <a
-          href={`/monitors/${m.id}`}
-          className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-        >
-          Details
-        </a>
-      </div>
+      {!readOnly && (
+        <div className="mt-5 flex items-center gap-2">
+          <a
+            href={`/status/${m.slug}`}
+            className="inline-flex flex-1 items-center justify-center rounded-xl bg-slate-900 px-3 py-2 text-sm font-medium text-white hover:bg-slate-800"
+          >
+            View status
+          </a>
+          <a
+            href={`/monitors/${m.id}`}
+            className="inline-flex items-center justify-center rounded-xl border border-slate-200 px-3 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+          >
+            Details
+          </a>
+        </div>
+      )}
     </li>
   );
 }

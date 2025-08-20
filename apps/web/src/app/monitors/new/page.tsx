@@ -56,21 +56,20 @@ export default function NewMonitor() {
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setBannerErr(null);
-
+  
     // run validation
     const uErr = validateUrl(url);
     const iErr = validateInterval(intervalSec);
     setUrlErr(uErr);
     setIntErr(iErr);
-
+  
     if (uErr) urlRef.current?.focus();
     else if (iErr) intRef.current?.focus();
-
     if (uErr || iErr) return;
-
+  
     setLoading(true);
     try {
-      const res = await fetch(`${base}/v1/monitors`, {
+      const res = await fetch(`/api/monitors`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
@@ -80,15 +79,21 @@ export default function NewMonitor() {
           expected_status: expected,
         }),
       });
+  
       if (!res.ok) {
         if (res.status === 409) {
           const body = await res.json().catch(() => ({}));
-          setBannerErr(body?.detail || "A monitor with that name already exists. Try a different name.");
+          setBannerErr(
+            body?.detail || "A monitor with that name already exists. Try a different name."
+          );
+        } else if (res.status === 401) {
+          setBannerErr("You must be signed in to create a monitor.");
         } else {
           setBannerErr("Failed to create monitor. Please try again.");
         }
         return;
       }
+  
       const created = await res.json();
       router.push(`/status/${created.slug}`);
       router.refresh();
@@ -98,6 +103,7 @@ export default function NewMonitor() {
       setLoading(false);
     }
   }
+  
 
   // live validation on blur
   function onUrlBlur() {
@@ -118,21 +124,6 @@ export default function NewMonitor() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
-      {/* Header */}
-      <header className="sticky top-0 z-10 border-b border-slate-200 bg-white/70 backdrop-blur">
-        <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="h-6 w-6 rounded-lg bg-gradient-to-tr from-emerald-500 to-sky-500 shadow-sm" />
-            <span className="text-lg font-semibold tracking-tight">Uptime Monitor</span>
-          </div>
-          <a
-            href="/"
-            className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
-          >
-            ← Dashboard
-          </a>
-        </div>
-      </header>
 
       {/* Content */}
       <main className="mx-auto max-w-3xl px-6 py-10">

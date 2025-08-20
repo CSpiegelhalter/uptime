@@ -5,7 +5,7 @@ from sqlalchemy.exc import IntegrityError
 from ..db import get_db, Base, engine
 from ..models import Monitor, Check, User
 from ..schemas import MonitorCreate, MonitorRead, Summary
-from ..utils import ulid, slugify, unique_slug
+from ..utils import ulid, slugify, unique_slug, normalize_url
 from ..services.scheduler import schedule_monitor, unschedule_monitor
 from ..deps import get_current_user
 
@@ -67,7 +67,7 @@ def delete_monitor(monitor_id: str, db: Session = Depends(get_db), user: User = 
     m = db.get(Monitor, monitor_id)
     if not m or m.user_id != user.id:
         raise HTTPException(404, "Monitor not found")
-    unschedule_monitor(m.id)
+    unschedule_monitor(m)
     db.delete(m); db.commit()
 
 @router.get("/{monitor_id}/summary", response_model=Summary)

@@ -15,13 +15,20 @@ export default function DeleteMonitorButton({
     if (!confirm(`Delete "${name}"?\nAll checks and incidents will be removed.`)) return;
     setLoading(true);
     try {
-      const base = process.env.NEXT_PUBLIC_API_BASE ?? "http://localhost:8000";
-      const res = await fetch(`${base}/v1/monitors/${id}`, { method: "DELETE" });
-      if (!res.ok && res.status !== 204) throw new Error("Delete failed");
-      router.push(redirectTo);
-      router.refresh();
-    } catch (e) {
-      alert("Failed to delete monitor.");
+      const res = await fetch(`/api/monitors/${id}`, { method: "DELETE" });
+      if (res.status === 204 || res.ok) {
+        router.push(redirectTo);
+        router.refresh();
+        return;
+      }
+      if (res.status === 401) {
+        alert("You must be signed in to delete this monitor.");
+        return;
+      }
+      const body = await res.json().catch(() => ({}));
+      alert(body?.detail || "Failed to delete monitor.");
+    } catch {
+      alert("Network error. Please try again.");
     } finally {
       setLoading(false);
     }

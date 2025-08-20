@@ -3,9 +3,9 @@ from pydantic import BaseModel, EmailStr
 from sqlalchemy.orm import Session
 from passlib.hash import bcrypt
 import jwt, datetime
-from .db import get_db
-from .models import User
-from .utils import ulid
+from ..db import get_db
+from ..models import User
+from ..utils import ulid
 
 JWT_SECRET = "change-me"  # from env
 JWT_EXP_MIN = 60 * 24 * 7
