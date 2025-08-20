@@ -2,6 +2,13 @@ import MonitorCard, { type MonitorListItem } from "@/components/MonitorCard";
 import { apiBase } from "@/lib/api";
 
 export const dynamic = "force-dynamic";
+type DemoSnapshotItem = {
+    name: string;
+    url: string;
+    status_code: number | null;
+    ok: boolean | null;
+    latency_ms: number | null;
+  };
 
 async function getDemo() {
   const base = apiBase();
@@ -14,7 +21,7 @@ function slugify(s: string) {
   return s.toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
 }
 
-function toDemoMonitorItem(x: any): MonitorListItem {
+function toDemoMonitorItem(x: DemoSnapshotItem): MonitorListItem {
   // Provide a MonitorListItem shape that MonitorCard expects.
   // We fake some fields that don’t exist for demo items.
   const host = (() => {

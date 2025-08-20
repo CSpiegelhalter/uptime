@@ -1,5 +1,6 @@
 import { apiBase } from "@/lib/api";
 import DeleteMonitorButton from "@/components/DeleteMonitorButton";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
@@ -55,12 +56,12 @@ export default async function StatusPage({
             <p className="mt-1 text-sm text-slate-600">
               No status page found for <code>{slug}</code>.
             </p>
-            <a
+            <Link
               href="/"
               className="mt-6 inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
             >
               ← Back to dashboard
-            </a>
+            </Link>
           </div>
         </div>
       </main>
@@ -77,12 +78,12 @@ export default async function StatusPage({
         {/* Page title + breadcrumby back link */}
         <div className="mb-4 flex items-center justify-between">
           <div>
-            <a
+            <Link
               href="/"
               className="text-sm text-slate-600 underline-offset-2 hover:underline"
             >
               ← Back to dashboard
-            </a>
+            </Link>
             <h1 className="mt-2 text-2xl font-semibold tracking-tight">
               Status · {m?.name ?? slug}
             </h1>
@@ -94,7 +95,7 @@ export default async function StatusPage({
           <div className="flex flex-col justify-between gap-4 sm:flex-row sm:items-center">
             <div>
               <h2 className="text-lg font-semibold tracking-tight">{m.name}</h2>
-              <a
+              <Link
                 href={m.url}
                 target="_blank"
                 rel="noreferrer"
@@ -102,7 +103,7 @@ export default async function StatusPage({
                 title={m.url}
               >
                 {m.url}
-              </a>
+              </Link>
               <div className="mt-3 flex flex-wrap items-center gap-2">
                 <StatusPill ok={isUp} />
                 <Chip>Every {m.interval_sec}s</Chip>
@@ -136,29 +137,29 @@ export default async function StatusPage({
 
         {/* Actions: left = navigation; right = visit + delete */}
         <section className="mt-6 flex flex-wrap items-center gap-3">
-          <a
+          <Link
             href={`/status/${slug}`}
             className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
             title="Refresh"
           >
             Refresh
-          </a>
-          <a
+          </Link>
+          <Link
             href={`/`}
             className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             View all monitors
-          </a>
+          </Link>
 
           <div className="ml-auto flex items-center gap-2">
-            <a
+            <Link
               href={m?.url}
               target="_blank"
               rel="noreferrer"
               className="rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-800"
             >
               Visit URL
-            </a>
+            </Link>
             {/* 🔴 Delete lives ONLY on the status page */}
             <DeleteMonitorButton id={m.id} name={m.name} redirectTo="/" />
           </div>
@@ -178,14 +179,14 @@ export default async function StatusPage({
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-slate-600">URL</dt>
                 <dd className="truncate font-medium text-slate-900" title={m.url}>
-                  <a
+                  <Link
                     className="underline-offset-2 hover:underline"
                     href={m.url}
                     target="_blank"
                     rel="noreferrer"
                   >
                     {m.url}
-                  </a>
+                  </Link>
                 </dd>
               </div>
               <div className="flex items-center justify-between gap-3">

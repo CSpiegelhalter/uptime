@@ -1,19 +1,41 @@
 import { apiBase } from "@/lib/api";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
 
+type ApiMonitor = {
+  id: string;
+  name: string;
+  url: string;
+  slug: string;
+  interval_sec: number;
+  expected_status: number;
+};
+
+type SummaryResp = { uptime_pct?: number; avg_latency_ms?: number } | null;
+
+type Last = { ts?: string; ok?: boolean; status_code?: number; latency_ms?: number } | null;
+type StatusResp = { monitors: Array<{ last?: Last }> };
+
 function fmt(ts?: string) {
   if (!ts) return "—";
-  try { return new Date(ts).toLocaleString(); } catch { return ts; }
+  try {
+    return new Date(ts).toLocaleString();
+  } catch {
+    return ts;
+  }
 }
 
-async function getData(id: string) {
+async function getData(
+  id: string
+): Promise<{ m: ApiMonitor; summary: SummaryResp; last: Last } | null> {
   const base = apiBase();
+
   // get monitor info from the list (keeps API minimal)
   const listRes = await fetch(`${base}/v1/monitors`, { cache: "no-store" });
   if (!listRes.ok) return null;
-  const all = await listRes.json();
-  const m = all.find((x: any) => x.id === id);
+  const all: ApiMonitor[] = await listRes.json();
+  const m = all.find((x) => x.id === id);
   if (!m) return null;
 
   const [sumRes, statRes] = await Promise.all([
@@ -21,16 +43,18 @@ async function getData(id: string) {
     fetch(`${base}/v1/status/${m.slug}`, { cache: "no-store" }),
   ]);
 
-  const summary = sumRes.ok ? await sumRes.json() : null;
-  const statusJson = statRes.ok ? await statRes.json() : null;
-  const last = statusJson?.monitors?.[0]?.last ?? null;
+  const summary: SummaryResp = sumRes.ok ? await sumRes.json() : null;
+  const statusJson: StatusResp | null = statRes.ok ? await statRes.json() : null;
+  const last: Last = statusJson?.monitors?.[0]?.last ?? null;
 
   return { m, summary, last };
 }
 
 export default async function MonitorDetails({
   params,
-}: { params: Promise<{ id: string }> }) {
+}: {
+  params: Promise<{ id: string }>;
+}) {
   const { id } = await params;
   const data = await getData(id);
 
@@ -40,9 +64,12 @@ export default async function MonitorDetails({
         <div className="mx-auto max-w-4xl">
           <div className="rounded-2xl border border-slate-200 bg-white p-8 text-center shadow-sm">
             <h1 className="text-xl font-semibold">Monitor not found</h1>
-            <a href="/" className="mt-6 inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800">
+            <Link
+              href="/"
+              className="mt-6 inline-flex rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white hover:bg-slate-800"
+            >
               ← Back to dashboard
-            </a>
+            </Link>
           </div>
         </div>
       </main>
@@ -50,7 +77,6 @@ export default async function MonitorDetails({
   }
 
   const { m, summary, last } = data;
-  const isUp = last?.ok ?? null;
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
@@ -58,11 +84,23 @@ export default async function MonitorDetails({
         <div className="mx-auto flex max-w-6xl items-center justify-between px-6 py-4">
           <div className="flex items-center gap-3">
             <div className="h-6 w-6 rounded-lg bg-gradient-to-tr from-emerald-500 to-sky-500 shadow-sm" />
-            <span className="text-lg font-semibold tracking-tight">Details · {m.name}</span>
+            <span className="text-lg font-semibold tracking-tight">
+              Details · {m.name}
+            </span>
           </div>
           <div className="flex items-center gap-2">
-            <a href={`/status/${m.slug}`} className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">Public status</a>
-            <a href="/" className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50">← Dashboard</a>
+            <Link
+              href={`/status/${m.slug}`}
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              Public status
+            </Link>
+            <Link
+              href="/"
+              className="rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
+            >
+              ← Dashboard
+            </Link>
           </div>
         </div>
       </header>
@@ -70,7 +108,12 @@ export default async function MonitorDetails({
       <main className="mx-auto max-w-6xl px-6 py-8">
         <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
           <h1 className="text-2xl font-semibold tracking-tight">{m.name}</h1>
-          <a href={m.url} target="_blank" rel="noreferrer" className="mt-1 block max-w-full truncate text-sm text-slate-600 underline-offset-2 hover:underline">
+          <a
+            href={m.url}
+            target="_blank"
+            rel="noreferrer"
+            className="mt-1 block max-w-full truncate text-sm text-slate-600 underline-offset-2 hover:underline"
+          >
             {m.url}
           </a>
 
@@ -80,9 +123,14 @@ export default async function MonitorDetails({
               <div className="mt-1 text-slate-700">
                 {summary ? (
                   <>
-                    {summary.uptime_pct ?? "—"}% · {summary.avg_latency_ms != null ? `${Math.round(summary.avg_latency_ms)} ms` : "—"}
+                    {summary.uptime_pct ?? "—"}% ·{" "}
+                    {summary.avg_latency_ms != null
+                      ? `${Math.round(summary.avg_latency_ms)} ms`
+                      : "—"}
                   </>
-                ) : "—"}
+                ) : (
+                  "—"
+                )}
               </div>
             </div>
 
@@ -91,9 +139,12 @@ export default async function MonitorDetails({
               <div className="mt-1 text-slate-700">
                 {last ? (
                   <>
-                    {fmt(last.ts)} · HTTP {last.status_code ?? "—"} · {last.latency_ms} ms
+                    {fmt(last.ts)} · HTTP {last.status_code ?? "—"} ·{" "}
+                    {last.latency_ms} ms
                   </>
-                ) : "Waiting for first check…"}
+                ) : (
+                  "Waiting for first check…"
+                )}
               </div>
             </div>
           </div>
@@ -102,15 +153,21 @@ export default async function MonitorDetails({
         {/* Placeholder for future config / recent checks */}
         <section className="mt-6 grid gap-5 md:grid-cols-2">
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Configuration</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Configuration
+            </h2>
             <dl className="mt-3 space-y-2 text-sm">
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-slate-600">Interval</dt>
-                <dd className="font-medium text-slate-900">{m.interval_sec}s</dd>
+                <dd className="font-medium text-slate-900">
+                  {m.interval_sec}s
+                </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-slate-600">Expected status</dt>
-                <dd className="font-medium text-slate-900">{m.expected_status}</dd>
+                <dd className="font-medium text-slate-900">
+                  {m.expected_status}
+                </dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-slate-600">Slug</dt>
@@ -120,7 +177,9 @@ export default async function MonitorDetails({
           </div>
 
           <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
-            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">Recent checks</h2>
+            <h2 className="text-sm font-semibold uppercase tracking-wide text-slate-500">
+              Recent checks
+            </h2>
             <p className="mt-2 text-sm text-slate-600">Coming soon</p>
           </div>
         </section>

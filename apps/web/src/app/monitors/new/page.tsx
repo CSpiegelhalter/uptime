@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { apiBase } from "@/lib/api";
+import Link from "next/link";
 
 export default function NewMonitor() {
   const router = useRouter();
@@ -50,8 +50,6 @@ export default function NewMonitor() {
     if (n < 10 || n > 3600) return "Interval must be between 10 and 3600 seconds.";
     return null;
   }
-
-  const base = apiBase();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -247,12 +245,12 @@ export default function NewMonitor() {
               >
                 {loading ? "Creating…" : "Create monitor"}
               </button>
-              <a
+              <Link
                 href="/"
                 className="inline-flex items-center rounded-xl border border-slate-200 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-50"
               >
                 Cancel
-              </a>
+              </Link>
             </div>
           </form>
         </div>

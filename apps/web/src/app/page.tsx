@@ -1,9 +1,22 @@
 import MonitorCard, { type MonitorListItem } from "@/components/MonitorCard";
 import { apiBase } from "@/lib/api";
 import { readTokenServer } from "@/lib/session";
+import Link from "next/link";
 
 export const dynamic = "force-dynamic";
+type ApiMonitor = {
+  id: string;
+  name: string;
+  url: string;
+  slug: string;
+  interval_sec: number;
+  expected_status: number;
+};
 
+type SummaryResp = { uptime_pct?: number; avg_latency_ms?: number } | null;
+
+type StatusLast = { ok?: boolean; status_code?: number; latency_ms?: number } | null;
+type StatusResp = { monitors: Array<{ last?: StatusLast }> };
 async function fetchMonitors(): Promise<MonitorListItem[]> {
   const base = apiBase();
   const token = await readTokenServer();
@@ -15,14 +28,14 @@ async function fetchMonitors(): Promise<MonitorListItem[]> {
     headers: authHeaders
   });
   console.log(authHeaders)
-  
+
   if (!res.ok) return [];
   console.log('after')
-  const monitors = await res.json();
+  const monitors: ApiMonitor[] = await res.json();
 
   // Enrich each monitor with summary (private) + last check via public status
   const enriched = await Promise.all(
-    monitors.map(async (m: any) => {
+    monitors.map(async (m: ApiMonitor) => {
       const [sumRes, statRes] = await Promise.all([
         fetch(`${base}/v1/monitors/${m.id}/summary?range=24h`, {
           cache: "no-store",
@@ -31,8 +44,8 @@ async function fetchMonitors(): Promise<MonitorListItem[]> {
         fetch(`${base}/v1/status/${m.slug}`, { cache: "no-store" }),
       ]);
 
-      const summary = sumRes.ok ? await sumRes.json() : null;
-      const statusJson = statRes.ok ? await statRes.json() : null;
+      const summary: SummaryResp = sumRes.ok ? await sumRes.json() : null;
+      const statusJson: StatusResp = statRes.ok ? await statRes.json() : null;
       const last = statusJson?.monitors?.[0]?.last ?? null;
 
       return {
@@ -74,12 +87,12 @@ export default async function Home() {
             <p className="mx-auto mt-1 max-w-md text-sm text-slate-600">
               Create your first monitor to start collecting checks and uptime.
             </p>
-            <a
+            <Link
               href="/monitors/new"
               className="mt-5 inline-flex rounded-xl bg-emerald-600 px-4 py-2 text-sm font-medium text-white shadow hover:bg-emerald-500"
             >
               Create monitor
-            </a>
+            </Link>
           </div>
         ) : (
           <ul className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
