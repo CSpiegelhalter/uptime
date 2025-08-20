@@ -1,30 +1,54 @@
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from sqlalchemy import select, text
+from sqlalchemy.exc import IntegrityError
 from ..db import get_db, Base, engine
 from ..models import Monitor, Check
 from ..schemas import MonitorCreate, MonitorRead, Summary
-from ..utils import ulid, slugify
+from ..utils import ulid, slugify, unique_slug
 from ..services.scheduler import schedule_monitor, unschedule_monitor
 
 router = APIRouter(prefix="/v1/monitors", tags=["monitors"])
 
-@router.post("", response_model=MonitorRead)
+@router.post("", response_model=MonitorRead, status_code=201)
 def create_monitor(payload: MonitorCreate, db: Session = Depends(get_db)):
-    m = Monitor(
-        id=ulid(),
-        slug=slugify(payload.name),
-        name=payload.name,
-        url=str(payload.url),
-        interval_sec=payload.interval_sec,
-        expected_status=payload.expected_status,
-    )
-    db.add(m); db.commit(); db.refresh(m)
+    base_slug = slugify(payload.name or "Untitled")
+    slug = unique_slug(db, base_slug)
 
-    # 🔹 schedule + run first check immediately
-    schedule_monitor(m, immediate=True)
+    # Try insert, if a race still wins, retry with incremented suffix a few times
+    for attempt in range(5):
+        try:
+            norm = normalize_url(str(payload.url))
+            m = Monitor(
+                id=ulid(),
+                slug=slug,
+                name=payload.name or "Untitled",
+                url=norm,                                # store normalized
+                interval_sec=payload.interval_sec,
+                expected_status=payload.expected_status,
+                user_id=user.id,
+            )
 
-    return m
+            db.add(m)
+            db.commit()
+            db.refresh(m)
+
+            schedule_monitor(m, immediate=True)
+            return m
+
+        except IntegrityError as e:
+            db.rollback()
+            # If slug collided, pick another suffix and retry
+            if "ix_monitors_slug" in str(e.orig) or "UniqueViolation" in str(e.orig) or "slug" in str(e.orig):
+                # bump to next numeric suffix deterministically
+                # compute from existing rows again (cheap) to avoid guessing
+                slug = unique_slug(db, base_slug)
+                continue
+            # some other integrity error
+            raise
+
+    # If we somehow failed to get a unique slug after retries:
+    raise HTTPException(status_code=409, detail="A monitor with a similar name already exists. Please try a different name.")
 
 @router.get("", response_model=list[MonitorRead])
 def list_monitors(db: Session = Depends(get_db)):
@@ -41,8 +65,8 @@ def delete_monitor(monitor_id: str, db: Session = Depends(get_db)):
     m = db.get(Monitor, monitor_id)
     if not m:
         raise HTTPException(404, "Monitor not found")
-    unschedule_monitor(m.id)           # 👈 stop periodic pings
-    db.delete(m)                       # cascades delete checks/incidents
+    unschedule_monitor(m)               
+    db.delete(m)
     db.commit()
     return
 

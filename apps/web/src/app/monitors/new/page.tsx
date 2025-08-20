@@ -1,58 +1,120 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { apiBase } from "@/lib/api";
 
 export default function NewMonitor() {
   const router = useRouter();
+
+  // form state
   const [name, setName] = useState("");
   const [url, setUrl] = useState("https://");
-  const [intervalSec, setIntervalSec] = useState(60);
+  const [intervalSec, setIntervalSec] = useState<number | "">(60);
   const [expected, setExpected] = useState(200);
-  const [loading, setLoading] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
 
+  // ui state
+  const [loading, setLoading] = useState(false);
+  const [bannerErr, setBannerErr] = useState<string | null>(null);
+
+  // field errors
+  const [urlErr, setUrlErr] = useState<string | null>(null);
+  const [intErr, setIntErr] = useState<string | null>(null);
+
+  // refs for focusing first invalid field
+  const urlRef = useRef<HTMLInputElement | null>(null);
+  const intRef = useRef<HTMLInputElement | null>(null);
+
+  // ---- validation helpers ----
   function normalizeUrl(u: string) {
     if (!u) return u;
-    if (!/^https?:\/\//i.test(u)) return `https://${u}`;
-    return u;
+    return /^https?:\/\//i.test(u) ? u : `https://${u}`;
   }
+
+  function validateUrl(u: string): string | null {
+    if (!u || !u.trim()) return "URL is required.";
+    try {
+      // accept host-only by normalizing, then test parse
+      // but keep the normalized value only onBlur/submit to avoid jumpy typing
+      new URL(normalizeUrl(u.trim()));
+      return null;
+    } catch {
+      return "Enter a valid URL (e.g. https://example.com).";
+    }
+  }
+
+  function validateInterval(v: number | ""): string | null {
+    if (v === "" || Number.isNaN(v)) return "Interval is required.";
+    if (!Number.isInteger(Number(v))) return "Interval must be a whole number.";
+    const n = Number(v);
+    if (n < 10 || n > 3600) return "Interval must be between 10 and 3600 seconds.";
+    return null;
+  }
+
+  const base = apiBase();
 
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setErr(null);
+    setBannerErr(null);
 
-    if (!name.trim()) return setErr("Please enter a name.");
-    if (!url.trim()) return setErr("Please enter a URL.");
-    if (intervalSec < 10 || intervalSec > 3600) return setErr("Interval must be between 10s and 3600s.");
+    // run validation
+    const uErr = validateUrl(url);
+    const iErr = validateInterval(intervalSec);
+    setUrlErr(uErr);
+    setIntErr(iErr);
 
-    const base = apiBase();
+    if (uErr) urlRef.current?.focus();
+    else if (iErr) intRef.current?.focus();
+
+    if (uErr || iErr) return;
+
     setLoading(true);
     try {
       const res = await fetch(`${base}/v1/monitors`, {
         method: "POST",
         headers: { "content-type": "application/json" },
         body: JSON.stringify({
-          name: name.trim(),
+          name: name.trim() || "Untitled",
           url: normalizeUrl(url.trim()),
-          interval_sec: intervalSec,
+          interval_sec: Number(intervalSec),
           expected_status: expected,
         }),
       });
       if (!res.ok) {
-        setErr("Failed to create monitor.");
+        if (res.status === 409) {
+          const body = await res.json().catch(() => ({}));
+          setBannerErr(body?.detail || "A monitor with that name already exists. Try a different name.");
+        } else {
+          setBannerErr("Failed to create monitor. Please try again.");
+        }
         return;
       }
       const created = await res.json();
       router.push(`/status/${created.slug}`);
       router.refresh();
     } catch {
-      setErr("Network error. Please try again.");
+      setBannerErr("Network error. Please check your connection and try again.");
     } finally {
       setLoading(false);
     }
   }
+
+  // live validation on blur
+  function onUrlBlur() {
+    setUrl((prev) => normalizeUrl(prev.trim()));
+    setUrlErr(validateUrl(url));
+  }
+  function onIntervalBlur() {
+    setIntErr(validateInterval(intervalSec));
+  }
+
+  // quick preset helper
+  function setPreset(n: number) {
+    setIntervalSec(n);
+    setIntErr(null);
+  }
+
+  const formInvalid = Boolean(urlErr || intErr || loading);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-50 to-white">
@@ -80,13 +142,13 @@ export default function NewMonitor() {
             We’ll ping your URL on a schedule, track uptime & latency, and publish a shareable status page.
           </p>
 
-          {err && (
+          {bannerErr && (
             <div className="mt-4 rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-800">
-              {err}
+              {bannerErr}
             </div>
           )}
 
-          <form onSubmit={onSubmit} className="mt-6 space-y-5">
+          <form onSubmit={onSubmit} className="mt-6 space-y-5" noValidate>
             <div>
               <label className="block text-sm font-medium text-slate-800">Name</label>
               <input
@@ -99,28 +161,56 @@ export default function NewMonitor() {
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-slate-800">URL</label>
+              <label className="block text-sm font-medium text-slate-800">URL <span className="text-red-500">*</span></label>
               <input
-                className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-2.5 text-sm shadow-sm outline-none focus:border-emerald-400"
+                ref={urlRef}
+                inputMode="url"
+                className={`mt-1 w-full rounded-xl bg-white p-2.5 text-sm shadow-sm outline-none transition ${
+                  urlErr ? "border-red-400 focus:border-red-500" : "border-slate-300 focus:border-emerald-400"
+                }`}
                 placeholder="https://example.com"
                 value={url}
-                onChange={(e) => setUrl(e.currentTarget.value)}
-                onBlur={(e) => setUrl(normalizeUrl(e.currentTarget.value))}
+                onChange={(e) => {
+                  setUrl(e.currentTarget.value);
+                  if (urlErr) setUrlErr(null);
+                }}
+                onBlur={onUrlBlur}
+                aria-invalid={Boolean(urlErr)}
+                aria-describedby={urlErr ? "url-error" : undefined}
+                required
               />
-              <p className="mt-1 text-xs text-slate-500">We’ll perform a GET request to this URL.</p>
+              <div className="mt-1 flex items-center justify-between">
+                <p className={`text-xs ${urlErr ? "text-red-600" : "text-slate-500"}`}>
+                  {urlErr ?? "We’ll perform a GET request to this URL."}
+                </p>
+              </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
-                <label className="block text-sm font-medium text-slate-800">Interval (seconds)</label>
+                <label className="block text-sm font-medium text-slate-800">
+                  Interval (seconds) <span className="text-red-500">*</span>
+                </label>
                 <div className="mt-1 flex gap-2">
                   <input
+                    ref={intRef}
                     type="number"
                     min={10}
                     max={3600}
+                    step={1}
                     value={intervalSec}
-                    onChange={(e) => setIntervalSec(Number(e.currentTarget.value))}
-                    className="w-full rounded-xl border border-slate-300 bg-white p-2.5 text-sm shadow-sm outline-none focus:border-emerald-400"
+                    onChange={(e) => {
+                      const val = e.currentTarget.value;
+                      setIntervalSec(val === "" ? "" : Number(val));
+                      if (intErr) setIntErr(null);
+                    }}
+                    onBlur={onIntervalBlur}
+                    className={`w-full rounded-xl bg-white p-2.5 text-sm shadow-sm outline-none transition ${
+                      intErr ? "border-red-400 focus:border-red-500" : "border-slate-300 focus:border-emerald-400"
+                    }`}
+                    aria-invalid={Boolean(intErr)}
+                    aria-describedby={intErr ? "interval-error" : undefined}
+                    required
                   />
                   {/* Quick presets */}
                   <div className="hidden gap-2 sm:flex">
@@ -128,7 +218,7 @@ export default function NewMonitor() {
                       <button
                         key={s}
                         type="button"
-                        onClick={() => setIntervalSec(s)}
+                        onClick={() => setPreset(s)}
                         className="rounded-lg border border-slate-200 px-2.5 py-1 text-xs text-slate-700 hover:bg-slate-50"
                       >
                         {s >= 60 ? `${s / 60}m` : `${s}s`}
@@ -136,7 +226,9 @@ export default function NewMonitor() {
                     ))}
                   </div>
                 </div>
-                <p className="mt-1 text-xs text-slate-500">How often to ping the URL.</p>
+                <p id="interval-error" className={`mt-1 text-xs ${intErr ? "text-red-600" : "text-slate-500"}`}>
+                  {intErr ?? "How often to ping the URL (10–3600 seconds)."}
+                </p>
               </div>
 
               <div>
@@ -159,7 +251,7 @@ export default function NewMonitor() {
             <div className="mt-2 flex items-center gap-3">
               <button
                 type="submit"
-                disabled={loading}
+                disabled={formInvalid}
                 className="inline-flex items-center rounded-xl bg-slate-900 px-4 py-2 text-sm font-medium text-white shadow hover:bg-slate-800 disabled:opacity-50"
               >
                 {loading ? "Creating…" : "Create monitor"}

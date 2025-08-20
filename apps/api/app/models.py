@@ -16,6 +16,11 @@ class Monitor(Base):
     checks: Mapped[list["Check"]] = relationship(back_populates="monitor", cascade="all, delete-orphan")
     incidents: Mapped[list["Incident"]] = relationship(back_populates="monitor", cascade="all, delete-orphan")
 
+    user_id = mapped_column(String, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    owner = relationship("User", backref="monitors")
+
+
+
 class Check(Base):
     __tablename__ = "checks"
     id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
@@ -37,3 +42,11 @@ class Incident(Base):
     last_status_code: Mapped[int | None] = mapped_column(Integer, nullable=True)
 
     monitor: Mapped[Monitor] = relationship(back_populates="incidents")
+
+
+class User(Base):
+    __tablename__ = "users"
+    id = mapped_column(String, primary_key=True)           # ulid/uuid
+    email = mapped_column(String, unique=True, index=True, nullable=False)
+    password_hash = mapped_column(String, nullable=False)
+    created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
