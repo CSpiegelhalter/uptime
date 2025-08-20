@@ -1,0 +1,26 @@
+# VCS & OS
+.git
+.gitignore
+*.swp
+*.DS_Store
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+*.pytest_cache
+.mypy_cache
+.pytype
+.venv
+
+# Env & secrets
+.env
+.env.*
+!.env.example
+
+# Tests & local stuff
+tests/
+coverage/
+dist/
+build/
