@@ -1,31 +1,59 @@
-# /app/alembic/env.py
+# alembic/env.py
 from __future__ import annotations
 from logging.config import fileConfig
 import os
-from alembic import context
-from sqlalchemy import engine_from_config, pool
+from urllib.parse import urlsplit, urlunsplit
 
-# 1) load logging config
+from alembic import context
+from sqlalchemy import create_engine, pool
+
+# ----- Logging config
 config = context.config
-if config.config_file_name is not None:
+if config.config_file_name:
     fileConfig(config.config_file_name)
 
-# 2) load your models' metadata
-from app.db import Base  # where you declare Base = declarative_base()
-from app import models   # import models so tables are registered
+# ----- Read & normalize DB URL (force psycopg v3 driver)
+def normalize(url: str) -> str:
+    if url.startswith("postgres://"):
+        return "postgresql+psycopg://" + url[len("postgres://"):]
+    if url.startswith("postgresql://"):
+        return "postgresql+psycopg://" + url[len("postgresql://"):]
+    return url
 
+db_url = normalize(os.getenv("DATABASE_URL", ""))  # read env directly
+if not db_url:
+    raise RuntimeError("DATABASE_URL not set")
+
+# Alembic’s stdout helper (shows up reliably)
+def mask(u: str) -> str:
+    try:
+        s = urlsplit(u)
+        if "@" in s.netloc:
+            creds, host = s.netloc.split("@", 1)
+            if ":" in creds:
+                user, _ = creds.split(":", 1)
+                netloc = f"{user}:***@{host}"
+            else:
+                netloc = f"{creds}@{host}"
+        else:
+            netloc = s.netloc
+        return urlunsplit((s.scheme, netloc, s.path, s.query, s.fragment))
+    except Exception:
+        return u
+
+context.config.print_stdout(f"ALEMBIC sqlalchemy.url -> {mask(db_url)}")
+
+# Ensure alembic.ini gets a URL, though we won’t use engine_from_config
+config.set_main_option("sqlalchemy.url", db_url)
+
+# ----- Target metadata (import AFTER url work to avoid side effects)
+from app.models import Base  # noqa: E402
 target_metadata = Base.metadata
 
-# 3) get DATABASE_URL from env and inject into alembic config
-database_url = os.getenv("DATABASE_URL")
-if not database_url:
-    raise RuntimeError("DATABASE_URL not set")
-config.set_main_option("sqlalchemy.url", database_url)
-
+# ----- Offline / Online
 def run_migrations_offline() -> None:
-    url = config.get_main_option("sqlalchemy.url")
     context.configure(
-        url=url,
+        url=db_url,
         target_metadata=target_metadata,
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
@@ -36,13 +64,8 @@ def run_migrations_offline() -> None:
         context.run_migrations()
 
 def run_migrations_online() -> None:
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-        future=True,
-    )
-    with connectable.connect() as connection:
+    engine = create_engine(db_url, poolclass=pool.NullPool, future=True)
+    with engine.connect() as connection:
         context.configure(
             connection=connection,
             target_metadata=target_metadata,
